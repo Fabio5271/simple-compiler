@@ -1,0 +1,14 @@
+10 input b
+15 input e
+20 let x = b
+25 if e < 0 goto 55
+30 if e == 0 goto 65
+35 if e == 1 goto 70
+40 let x = x * b
+45 let e = e - 1
+50 goto 35
+55 let x = -1
+60 goto 70
+65 let x = 1
+70 print x
+75 end
