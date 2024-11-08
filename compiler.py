@@ -47,9 +47,7 @@ class Lexer:
                                 token_value = match.group(0)
                                 if token_type == 'LINE_NR': # Atualizar line_nr para as mensagens de erro
                                     line_nr = token_value
-                                    # print() # Debug
                                 self.tokens.append((token_type, token_value))
-                                # print(f"({token_type}, {token_value})") # Debug
                             linebuf = linebuf[match.end():] # Remove tudo antes do fim do match do buffer
                             break
                     if not match:
@@ -301,7 +299,6 @@ class SemanticAnalyzer:
         if line_number <= 0:
             raise RuntimeError(f"Número da linha inválido após 'goto', linha {self.current_line}")
         if line_number not in self.valid_lines: # Verifica se o número da linha existe
-            # print(self.valid_lines)
             raise RuntimeError(f"Linha {line_number} não existe, linha {self.current_line}")
         self.next_token()
 
@@ -444,14 +441,15 @@ class CodeGen:
                     self.code[l_id] = f'{line[:3]}{"%02d" % len(self.code)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code)
 
 
-# Exemplo de uso
+# ========== Código SIMPLE a ser compilado ==========:
 code = """
 05 rem erro sintatico na linha 75
 10 input n
 20 input x
 30 input y
-35 let y = -2
+35 let y = -2999
 40 let x = 5
+42 let z = 6969
 45 print x
 50 end
 """
@@ -467,24 +465,25 @@ semantic_analyzer.analyze_program()
 
 print("\nAnálise concluída!\n")
 
-# Debug: Listar todos os tokens:
-print('***Debug***: Tokens:')
-for token in tokens:
-    if token[0] == 'LINE_NR' and token != tokens[0]:
-        print()
-    print(token)
-
-code_gen = CodeGen(tokens)
+code_gen = CodeGen(tokens[:])
 code_gen.read_program()
 
-# Debug: Listar consts e vars:
-print('\n***Debug***: Consts:')
-for const in code_gen.consts:
-    print(const)
-print('\n***Debug***: Vars:')
-print(code_gen.vars)
-# for var in code_gen.var_lines:
-#     print(var)
+debug = True # Flag p/ imprimir tudo de debug
+
+if debug:
+    # Debug: Listar todos os tokens
+    print('***Debug***: Tokens:')
+    for token in tokens:
+        if token[0] == 'LINE_NR' and token != tokens[0]:
+            print()
+        print(token)
+
+    # Debug: Listar consts e vars
+    print('\n***Debug***: Consts:')
+    for const in code_gen.consts:
+        print(const)
+    print('\n***Debug***: Vars:')
+    print(code_gen.vars)
 
 # Conferir erros e avisar:
 if (lexer.error or parser.error or semantic_analyzer.error):
