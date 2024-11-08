@@ -21,6 +21,7 @@ class Lexer:
             ('COMPARISON', r'>=|>|<=|<|==|!='), # Tem que estar antes de assign p/ ser avaliado corretamente
             ('ASSIGN', r'='), # Tem que estar depois de comparison p/ não interferir em sua avaliação
         ]
+        self.error = False
 
     def tokenize(self):
         line_nr = 1
@@ -57,6 +58,7 @@ class Lexer:
                     tk_pos += 1
                 except SyntaxError as synerr:
                     print(f"\n***Erro***: Lexer: {synerr}\n")
+                    self.error = True
                     linebuf = linebuf[1:] # Remove o caracter atual do buffer
         return self.tokens
 
@@ -67,6 +69,7 @@ class Parser:
         self.current_token = None
         self.next_token()
         self.current_line = 1
+        self.error = False
 
     def next_token(self):
         if len(self.tokens) > 0:
@@ -80,12 +83,14 @@ class Parser:
                 self.parse_keyword()
             except SyntaxError as synerr:
                 print(f"\n***Erro***: Parser: {synerr}\n")
+                self.error = True
                 self.next_token()
         try:
             if self.current_token[0] == 'EOF': 
                 raise SyntaxError(f"\"end\" esperado após linha: {self.current_line}")
         except SyntaxError as synerr:
             print(f"\n***Erro***: Parser: {synerr}\n")
+            self.error = True
 
 
     def parse_keyword(self):
@@ -178,6 +183,7 @@ class SemanticAnalyzer:
         self.tokens = tokens
         self.current_token = None
         self.symbol_table = []
+        self.error = False
 
     def collect_valid_lines(self):
         # Recolhe todas as linhas válidas
@@ -200,11 +206,13 @@ class SemanticAnalyzer:
                     self.current_line = int(self.current_token[1])
                     if self.current_line < self.last_line: 
                         print(f"\n***Erro***: SemanticAnalyzer: Número de linha fora de ordem: {self.current_line}")
+                        self.error = True
                     try:
                         if self.current_line in self.read_lines:
                             raise RuntimeError(f"Linha Duplicada: {self.current_line}")
                     except RuntimeError as semerr:
                         print(f"\n***Erro***: SemanticAnalyzer: {semerr}\n")
+                        self.error = True
                     self.read_lines.append(self.current_line)
                     self.next_token()
                     self.analyze_keyword()
@@ -214,6 +222,7 @@ class SemanticAnalyzer:
                     self.next_token()
             except RuntimeError as semerr:
                 print(f"\n***Erro***: SemanticAnalyzer: {semerr}\n")
+                self.error = True
 
     def analyze_keyword(self):
         if self.current_token[0] == 'KW_INPUT':
@@ -292,7 +301,7 @@ class SemanticAnalyzer:
         if line_number <= 0:
             raise RuntimeError(f"Número da linha inválido após 'goto', linha {self.current_line}")
         if line_number not in self.valid_lines: # Verifica se o número da linha existe
-            print(self.valid_lines)
+            # print(self.valid_lines)
             raise RuntimeError(f"Linha {line_number} não existe, linha {self.current_line}")
         self.next_token()
 
@@ -339,45 +348,152 @@ class CodeGen:
     def __init__(self, tokens):
         self.tokens = tokens
         self.current_token = None
+        self.current_line = 1
         self.code = []
         self.var_lines = {} # Dict de linhas das variáveis
+        self.consts = []
+        self.goto_lines = [] # Linhas do código simple p/ onde um goto aponta
 
+    def next_token(self):
+        if len(self.tokens) > 0:
+            self.current_token = self.tokens.pop(0)
+        else:
+            self.current_token = ('EOF', 'EOF')
+
+    def add_var_to_list(self):
+        # self.next_token()
+        if self.current_token[0] == 'IDENTIFIER':
+            self.var_lines.setdefault(self.current_token[1], None)
+
+    def read_program(self):
+        self.next_token()
+        while self.current_token[0] != 'EOF' and self.current_token[0] != 'KW_END':
+            if self.current_token[0] == 'LINE_NR':
+                self.current_line = int(self.current_token[1])
+                self.next_token()
+                self.read_keyword()
+            else:
+                self.next_token()
+
+    def read_keyword(self):
+        if self.current_token[0] == 'KW_INPUT':
+            self.read_input()
+        elif self.current_token[0] == 'KW_LET':
+            self.read_let()
+        elif self.current_token[0] == 'KW_PRINT':
+            self.read_print()
+        # elif self.current_token[0] == 'KW_IF':
+        #     self.analyze_if()
+        # elif self.current_token[0] == 'KW_GOTO':
+        #     self.read_goto()
+        elif self.current_token[0] == 'COMMENT':
+            self.next_token()
+        elif self.current_token[0] == 'LINE_NR':
+            return
+        elif self.current_token[0] == 'KW_END':
+            self.proc_end()
+
+    def read_input(self):
+        self.next_token()
+        self.add_var_to_list()
+        self.code.append(f'+10{self.current_token[1]}')
+
+    def read_let(self):
+        self.next_token() # var1
+        self.add_var_to_list()
+        var1 = self.current_token[1]
+        self.next_token() # '='
+        self.next_token() # arg
+        if self.current_token[0] == 'NUMBER':
+            self.consts.append(int(self.current_token[1]))
+            self.code.append(f'+20C{len(self.consts)-1}')
+            self.code.append(f'+21{var1}')
+
+    def read_print(self):
+        self.next_token()
+        self.code.append(f'+11{self.current_token[1]}')
+
+    # def read_goto(self):
+    #     self.next_token()
+
+    def proc_end(self):
+        self.code.append('+4300')
+        self.proc_consts()
+        self.proc_vars()
+    
+    def proc_consts(self):
+        for c_id, const in enumerate(self.consts):
+            # Adicionar const após end:
+            if const < 0:
+                sign = '-'
+            else:
+                sign = '+'
+            self.code.append(f'{sign}{"%0004d" % abs(const)}') # Formatar const no padrão da SML
+            # Substituir menções de const pelo endereço de const:
+            for l_id, line in enumerate(self.code):
+                if f'C{c_id}' in line:
+                    self.code[l_id] = f'{line[:3]}{"%02d" % len(self.code)}' # Manter 3 primeiros caracteres da linha e substituir 2 últimos por c_id
+
+    def proc_vars(self):
+        for var in self.var_lines:
+            self.var_lines[var] = len(self.code)
 
 
 # Exemplo de uso
 code = """
 05 rem erro sintatico na linha 75
 10 input n
-15 if n > 0 goto 30
-20 let m = -1
-25 goto 70
-30 let s = 0
-35 let i = 1
-40 if i > n goto 65
-45 let a = 2 * i
-50 let s = s + a
-55 let i = i + 1
-60 goto 40
-65 let m = s / n
-70 print m
-75 end
+20 input x
+30 input y
+35 let y = -2
+40 let x = 5
+45 print x
+50 end
 """
 
 lexer = Lexer(code)
 tokens = lexer.tokenize()
-# print('\nTokens gerados!\n')
 
 parser = Parser(tokens[:])
 parser.parse_program()
-# print("\nAnálise sintática concluída!\n")
 
 semantic_analyzer = SemanticAnalyzer(tokens[:])
 semantic_analyzer.analyze_program()
-# print("\nAnálise semântica concluída!\n")
-
-print(tokens)
-
-# code_gen = CodeGen(tokens)
-
 
 print("\nAnálise concluída!\n")
+
+# Debug: Listar todos os tokens:
+print('***Debug***: Tokens:')
+for token in tokens:
+    if token[0] == 'LINE_NR' and token != tokens[0]:
+        print()
+    print(token)
+
+code_gen = CodeGen(tokens)
+code_gen.read_program()
+
+# Debug: Listar consts e vars:
+print('\n***Debug***: Consts:')
+for const in code_gen.consts:
+    print(const)
+print('\n***Debug***: Vars:')
+print(code_gen.var_lines)
+# for var in code_gen.var_lines:
+#     print(var)
+
+# Conferir erros e avisar:
+if (lexer.error or parser.error or semantic_analyzer.error):
+    print('\n***Info***: Erros encontrados na análise!\n')
+    if input('***Importante***: Tentar compilar mesmo assim? [S/n]: ') not in ['n', 'N']:
+        print('Código inoperante (compilado com erros):')
+        for instr in code_gen.code:
+            print(instr)
+    else:
+        print('Abortando!')
+else:
+    print('\nCompilado com sucesso!\n\nCódigo:')
+    for instr in code_gen.code:
+        print(instr)
+
+
+# print(f"test: {self.current_token}")
