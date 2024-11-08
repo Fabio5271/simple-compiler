@@ -350,7 +350,7 @@ class CodeGen:
         self.current_token = None
         self.current_line = 1
         self.code = []
-        self.var_lines = {} # Dict de linhas das variáveis
+        self.vars = [] # Dict de linhas das variáveis
         self.consts = []
         self.goto_lines = [] # Linhas do código simple p/ onde um goto aponta
 
@@ -361,9 +361,9 @@ class CodeGen:
             self.current_token = ('EOF', 'EOF')
 
     def add_var_to_list(self):
-        # self.next_token()
         if self.current_token[0] == 'IDENTIFIER':
-            self.var_lines.setdefault(self.current_token[1], None)
+            if self.current_token[1] not in self.vars:
+                self.vars.append(self.current_token[1])
 
     def read_program(self):
         self.next_token()
@@ -432,11 +432,16 @@ class CodeGen:
             # Substituir menções de const pelo endereço de const:
             for l_id, line in enumerate(self.code):
                 if f'C{c_id}' in line:
-                    self.code[l_id] = f'{line[:3]}{"%02d" % len(self.code)}' # Manter 3 primeiros caracteres da linha e substituir 2 últimos por c_id
+                    self.code[l_id] = f'{line[:3]}{"%02d" % len(self.code)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code)
 
     def proc_vars(self):
-        for var in self.var_lines:
-            self.var_lines[var] = len(self.code)
+        for var in self.vars:
+            # Adicionar var após end:
+            self.code.append(f'+000{var}')
+            # Substituir menções de var pelo endereço de var:
+            for l_id, line in enumerate(self.code):
+                if var in line:
+                    self.code[l_id] = f'{line[:3]}{"%02d" % len(self.code)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code)
 
 
 # Exemplo de uso
@@ -477,7 +482,7 @@ print('\n***Debug***: Consts:')
 for const in code_gen.consts:
     print(const)
 print('\n***Debug***: Vars:')
-print(code_gen.var_lines)
+print(code_gen.vars)
 # for var in code_gen.var_lines:
 #     print(var)
 
