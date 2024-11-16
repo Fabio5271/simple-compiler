@@ -345,11 +345,13 @@ class CodeGen:
     def __init__(self, tokens):
         self.tokens = tokens
         self.current_token = None
-        self.current_line = 1
+        # self.current_line = 0 # Linha atual do código SIMPLE
         self.code = []
-        self.vars = [] # Dict de linhas das variáveis
+        self.vars = {} # Dict de variáveis
+        self.calculated_vars = []
         self.consts = []
-        self.goto_lines = [] # Linhas do código simple p/ onde um goto aponta
+        self.equiv_lines = {}
+        # self.var_in_accum = None
 
     def next_token(self):
         if len(self.tokens) > 0:
@@ -359,14 +361,15 @@ class CodeGen:
 
     def add_var_to_list(self):
         if self.current_token[0] == 'IDENTIFIER':
-            if self.current_token[1] not in self.vars:
-                self.vars.append(self.current_token[1])
+            # if self.current_token[1] not in self.vars:
+            self.vars[self.current_token[1]] = None
 
     def read_program(self):
         self.next_token()
         while self.current_token[0] != 'EOF' and self.current_token[0] != 'KW_END':
             if self.current_token[0] == 'LINE_NR':
-                self.current_line = int(self.current_token[1])
+                # self.current_line = int(self.current_token[1])
+                self.equiv_lines[self.current_token[1]] = len(self.code)
                 self.next_token()
                 self.read_keyword()
             else:
@@ -396,22 +399,122 @@ class CodeGen:
         self.code.append(f'+10{self.current_token[1]}')
 
     def read_let(self):
-        self.next_token() # var1
+        self.next_token() # var
         self.add_var_to_list()
-        var1 = self.current_token[1]
+        var = self.current_token[1]
         self.next_token() # '='
-        self.next_token() # arg
+        self.next_token() # arg1
         if self.current_token[0] == 'NUMBER':
-            self.consts.append(int(self.current_token[1]))
-            self.code.append(f'+20C{len(self.consts)-1}')
-            self.code.append(f'+21{var1}')
+            num1 = int(self.current_token[1])
+        else: # se arg1 for variável:
+            arg1 = self.current_token[1]
+        self.next_token() # op
+        
+        if self.current_token[0] != 'OPERATOR': # Se tivermos o formato 'let var = arg1':
+            if 'num1' in locals(): # Se arg1 é número:
+                self.vars[var] = num1
+                self.consts.append(int(num1))
+                self.code.append(f'+20C{len(self.consts)-1}')
+            elif 'arg1' in locals(): # Se arg1 é var:
+                if self.vars[arg1] != None: # Se arg1 tem valor definido:
+                    self.vars[var] = self.vars[arg1]
+                self.code.append(f'+20{arg1}')
+            self.code.append(f'+21{var}')
+
+        else: # Se tivermos o formato 'let var = arg1 op arg2':
+            op = self.current_token[1]
+            self.next_token() # arg2
+            if 'num1' in locals(): # Se arg1 é número:
+                self.consts.append(int(num1))
+                self.code.append(f'+20C{len(self.consts)-1}')
+                if self.current_token[0] == 'NUMBER': # Se arg2 é número:
+                    self.vars[var] = self.calculate(num1, op, int(self.current_token[1]))
+                    self.consts.append(int(self.current_token[1]))
+                    match op:
+                        case '+':
+                            self.code.append(f'+30C{len(self.consts)-1}')
+                        case '-':
+                            self.code.append(f'+31C{len(self.consts)-1}')
+                        case '*':
+                            self.code.append(f'+33C{len(self.consts)-1}')
+                        case '/':
+                            self.code.append(f'+32C{len(self.consts)-1}')
+                        case '%':
+                            self.code.append(f'+34C{len(self.consts)-1}')
+                else: # Se arg2 é var:
+                    if self.vars[self.current_token[1]] != None: # Se arg2 tem valor definido:
+                        self.vars[var] = self.calculate(num1, op, self.vars[self.current_token[1]])
+                    match op:
+                        case '+':
+                            self.code.append(f'+30{self.current_token[1]}')
+                        case '-':
+                            self.code.append(f'+31{self.current_token[1]}')
+                        case '*':
+                            self.code.append(f'+33{self.current_token[1]}')
+                        case '/':
+                            self.code.append(f'+32{self.current_token[1]}')
+                        case '%':
+                            self.code.append(f'+34{self.current_token[1]}')
+            elif 'arg1' in locals(): # Se arg1 é var:
+                if self.vars[arg1] != None: # Se arg1 tem valor definido:
+                    if self.current_token[0] == 'NUMBER': # Se arg2 é número:
+                        self.vars[var] = self.calculate(self.vars[arg1], op, int(self.current_token[1]))
+                    else: # Se arg2 é var:
+                        if self.vars[self.current_token[1]] != None: # Se arg2 tem valor definido:
+                            self.vars[var] = self.calculate(self.vars[arg1], op, self.vars[self.current_token[1]])
+                
+                if self.current_token[0] == 'NUMBER': # Se arg2 é número:
+                    self.consts.append(int(self.current_token[1]))
+                    self.code.append(f'+20{arg1}')
+                    match op:
+                        case '+':
+                            self.code.append(f'+30C{len(self.consts)-1}')
+                        case '-':
+                            self.code.append(f'+31C{len(self.consts)-1}')
+                        case '*':
+                            self.code.append(f'+33C{len(self.consts)-1}')
+                        case '/':
+                            self.code.append(f'+32C{len(self.consts)-1}')
+                        case '%':
+                            self.code.append(f'+34C{len(self.consts)-1}')
+                else:
+                    self.code.append(f'+20{arg1}')
+                    match op:
+                        case '+':
+                            self.code.append(f'+30{self.current_token[1]}')
+                        case '-':
+                            self.code.append(f'+31{self.current_token[1]}')
+                        case '*':
+                            self.code.append(f'+33{self.current_token[1]}')
+                        case '/':
+                            self.code.append(f'+32{self.current_token[1]}')
+                        case '%':
+                            self.code.append(f'+34{self.current_token[1]}')
+            self.code.append(f'+21{var}')
+
+
+    def calculate(self, x, op, y):
+        match op:
+            case '+':
+                return x + y
+            case '-':
+                return x - y
+            case '*':
+                return x * y
+            case '/':
+                return x / y
+            case '%':
+                return x % y
+
 
     def read_print(self):
         self.next_token()
         self.code.append(f'+11{self.current_token[1]}')
 
-    # def read_goto(self):
-    #     self.next_token()
+    def read_goto(self):
+        self.next_token() # target line
+        self.code.append(f'+40B{self.current_token[1]}')
+
 
     def proc_end(self):
         self.code.append('+4300')
@@ -429,29 +532,30 @@ class CodeGen:
             # Substituir menções de const pelo endereço de const:
             for l_id, line in enumerate(self.code):
                 if f'C{c_id}' in line:
-                    self.code[l_id] = f'{line[:3]}{"%02d" % len(self.code)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code)
+                    self.code[l_id] = f'{line[:3]}{"%02d" % (len(self.code) - 1)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code) - 1
 
     def proc_vars(self):
         for var in self.vars:
             # Adicionar var após end:
-            self.code.append(f'+000{var}')
+            if self.vars[var] != None: # Se a var tiver um valor
+                if self.vars[var] < 0:
+                    sign = '-'
+                else:
+                    sign = '+'
+                self.code.append(f'{sign}{"%0004d" % abs(self.vars[var])}')
+            else:
+                # self.code.append(f'+00{"%02d" % len(self.code)}')
+                self.code.append('-7777')
             # Substituir menções de var pelo endereço de var:
             for l_id, line in enumerate(self.code):
                 if var in line:
-                    self.code[l_id] = f'{line[:3]}{"%02d" % len(self.code)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code)
+                    self.code[l_id] = f'{line[:3]}{"%02d" % (len(self.code) - 1)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code) - 1
 
 
 # ========== Código SIMPLE a ser compilado ==========:
 code = """
-05 rem erro sintatico na linha 75
-10 input n
-20 input x
-30 input y
-35 let y = -2999
-40 let x = 5
-42 let z = 6969
-45 print x
-50 end
+
+99 end
 """
 
 lexer = Lexer(code)
@@ -484,6 +588,8 @@ if debug:
         print(const)
     print('\n***Debug***: Vars:')
     print(code_gen.vars)
+    print('\n***Debug***: SIMPLE Line | SML Line:')
+    print(code_gen.equiv_lines)
 
 # Conferir erros e avisar:
 if (lexer.error or parser.error or semantic_analyzer.error):
