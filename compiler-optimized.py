@@ -348,7 +348,6 @@ class CodeGen:
         # self.current_line = 0 # Linha atual do código SIMPLE
         self.code = []
         self.vars = {} # Dict de variáveis
-        self.calculated_vars = []
         self.consts = []
         self.equiv_lines = {}
         self.var_in_accum = None

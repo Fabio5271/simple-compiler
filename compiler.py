@@ -345,13 +345,10 @@ class CodeGen:
     def __init__(self, tokens):
         self.tokens = tokens
         self.current_token = None
-        # self.current_line = 0 # Linha atual do código SIMPLE
         self.code = []
-        self.vars = {} # Dict de variáveis
-        self.calculated_vars = []
+        self.vars = []
         self.consts = []
         self.equiv_lines = {}
-        # self.var_in_accum = None
 
     def next_token(self):
         if len(self.tokens) > 0:
@@ -361,14 +358,14 @@ class CodeGen:
 
     def add_var_to_list(self):
         if self.current_token[0] == 'IDENTIFIER':
-            # if self.current_token[1] not in self.vars:
-            self.vars[self.current_token[1]] = None
+            # self.vars[self.current_token[1]] = None
+            if self.current_token[1] not in self.vars:
+                self.vars.append(self.current_token[1])
 
     def read_program(self):
         self.next_token()
         while self.current_token[0] != 'EOF' and self.current_token[0] != 'KW_END':
             if self.current_token[0] == 'LINE_NR':
-                # self.current_line = int(self.current_token[1])
                 self.equiv_lines[self.current_token[1]] = len(self.code)
                 self.next_token()
                 self.read_keyword()
@@ -382,10 +379,10 @@ class CodeGen:
             self.read_let()
         elif self.current_token[0] == 'KW_PRINT':
             self.read_print()
-        # elif self.current_token[0] == 'KW_IF':
-        #     self.analyze_if()
-        # elif self.current_token[0] == 'KW_GOTO':
-        #     self.read_goto()
+        elif self.current_token[0] == 'KW_IF':
+            self.read_if()
+        elif self.current_token[0] == 'KW_GOTO':
+            self.read_goto()
         elif self.current_token[0] == 'COMMENT':
             self.next_token()
         elif self.current_token[0] == 'LINE_NR':
@@ -412,12 +409,10 @@ class CodeGen:
         
         if self.current_token[0] != 'OPERATOR': # Se tivermos o formato 'let var = arg1':
             if 'num1' in locals(): # Se arg1 é número:
-                self.vars[var] = num1
-                self.consts.append(int(num1))
-                self.code.append(f'+20C{len(self.consts)-1}')
+                if num1 not in self.consts:
+                    self.consts.append(int(num1))
+                self.code.append(f'+20C{self.consts.index(num1)}')
             elif 'arg1' in locals(): # Se arg1 é var:
-                if self.vars[arg1] != None: # Se arg1 tem valor definido:
-                    self.vars[var] = self.vars[arg1]
                 self.code.append(f'+20{arg1}')
             self.code.append(f'+21{var}')
 
@@ -425,71 +420,37 @@ class CodeGen:
             op = self.current_token[1]
             self.next_token() # arg2
             if 'num1' in locals(): # Se arg1 é número:
-                self.consts.append(int(num1))
-                self.code.append(f'+20C{len(self.consts)-1}')
-                if self.current_token[0] == 'NUMBER': # Se arg2 é número:
-                    self.vars[var] = self.calculate(num1, op, int(self.current_token[1]))
-                    self.consts.append(int(self.current_token[1]))
-                    match op:
-                        case '+':
-                            self.code.append(f'+30C{len(self.consts)-1}')
-                        case '-':
-                            self.code.append(f'+31C{len(self.consts)-1}')
-                        case '*':
-                            self.code.append(f'+33C{len(self.consts)-1}')
-                        case '/':
-                            self.code.append(f'+32C{len(self.consts)-1}')
-                        case '%':
-                            self.code.append(f'+34C{len(self.consts)-1}')
-                else: # Se arg2 é var:
-                    if self.vars[self.current_token[1]] != None: # Se arg2 tem valor definido:
-                        self.vars[var] = self.calculate(num1, op, self.vars[self.current_token[1]])
-                    match op:
-                        case '+':
-                            self.code.append(f'+30{self.current_token[1]}')
-                        case '-':
-                            self.code.append(f'+31{self.current_token[1]}')
-                        case '*':
-                            self.code.append(f'+33{self.current_token[1]}')
-                        case '/':
-                            self.code.append(f'+32{self.current_token[1]}')
-                        case '%':
-                            self.code.append(f'+34{self.current_token[1]}')
+                if num1 not in self.consts:
+                    self.consts.append(int(num1))
+                self.code.append(f'+20C{self.consts.index(int(num1))}')
             elif 'arg1' in locals(): # Se arg1 é var:
-                if self.vars[arg1] != None: # Se arg1 tem valor definido:
-                    if self.current_token[0] == 'NUMBER': # Se arg2 é número:
-                        self.vars[var] = self.calculate(self.vars[arg1], op, int(self.current_token[1]))
-                    else: # Se arg2 é var:
-                        if self.vars[self.current_token[1]] != None: # Se arg2 tem valor definido:
-                            self.vars[var] = self.calculate(self.vars[arg1], op, self.vars[self.current_token[1]])
-                
-                if self.current_token[0] == 'NUMBER': # Se arg2 é número:
+                self.code.append(f'+20{arg1}')
+            if self.current_token[0] == 'NUMBER': # Se arg2 é número:
+                if int(self.current_token[1]) not in self.consts:
                     self.consts.append(int(self.current_token[1]))
-                    self.code.append(f'+20{arg1}')
-                    match op:
-                        case '+':
-                            self.code.append(f'+30C{len(self.consts)-1}')
-                        case '-':
-                            self.code.append(f'+31C{len(self.consts)-1}')
-                        case '*':
-                            self.code.append(f'+33C{len(self.consts)-1}')
-                        case '/':
-                            self.code.append(f'+32C{len(self.consts)-1}')
-                        case '%':
-                            self.code.append(f'+34C{len(self.consts)-1}')
-                else:
-                    self.code.append(f'+20{arg1}')
-                    match op:
-                        case '+':
-                            self.code.append(f'+30{self.current_token[1]}')
-                        case '-':
-                            self.code.append(f'+31{self.current_token[1]}')
-                        case '*':
-                            self.code.append(f'+33{self.current_token[1]}')
-                        case '/':
-                            self.code.append(f'+32{self.current_token[1]}')
-                        case '%':
-                            self.code.append(f'+34{self.current_token[1]}')
+                match op:
+                    case '+':
+                        self.code.append(f'+30C{self.consts.index(int(self.current_token[1]))}')
+                    case '-':
+                        self.code.append(f'+31C{self.consts.index(int(self.current_token[1]))}')
+                    case '*':
+                        self.code.append(f'+33C{self.consts.index(int(self.current_token[1]))}')
+                    case '/':
+                        self.code.append(f'+32C{self.consts.index(int(self.current_token[1]))}')
+                    case '%':
+                        self.code.append(f'+34C{self.consts.index(int(self.current_token[1]))}')
+            else: # Se arg2 é var:
+                match op:
+                    case '+':
+                        self.code.append(f'+30{self.current_token[1]}')
+                    case '-':
+                        self.code.append(f'+31{self.current_token[1]}')
+                    case '*':
+                        self.code.append(f'+33{self.current_token[1]}')
+                    case '/':
+                        self.code.append(f'+32{self.current_token[1]}')
+                    case '%':
+                        self.code.append(f'+34{self.current_token[1]}')
             self.code.append(f'+21{var}')
 
 
@@ -511,15 +472,73 @@ class CodeGen:
         self.next_token()
         self.code.append(f'+11{self.current_token[1]}')
 
+    def read_if(self):
+        self.next_token() # arg1
+        if self.current_token[0] == 'NUMBER':
+            if int(self.current_token[1]) not in self.consts:
+                self.consts.append(int(self.current_token[1]))
+            arg1 = f'C{self.consts.index(int(self.current_token[1]))}'
+        else:
+            arg1 = self.current_token[1]
+        self.next_token() # comp
+        comp = self.current_token[1]
+        self.next_token() # arg2
+        if self.current_token[0] == 'NUMBER':
+            if int(self.current_token[1]) not in self.consts:
+                self.consts.append(int(self.current_token[1]))
+            arg2 = f'C{self.consts.index(int(self.current_token[1]))}'
+        else:
+            arg2 = self.current_token[1]
+        match comp:
+            case '==':
+                self.code.append(f'+20{arg1}')
+                self.code.append(f'+31{arg2}')
+                self.next_token() # goto
+                self.next_token() # target line
+                self.code.append(f'+42B{self.current_token[1]}')
+            case '>':
+                self.code.append(f'+20{arg2}')
+                self.code.append(f'+31{arg1}')
+                self.next_token() # goto
+                self.next_token() # target line
+                self.code.append(f'+41B{self.current_token[1]}')
+            case '<':
+                self.code.append(f'+20{arg1}')
+                self.code.append(f'+31{arg2}')
+                self.next_token() # goto
+                self.next_token() # target line
+                self.code.append(f'+41B{self.current_token[1]}')
+            case '!=':
+                self.code.append(f'+20{arg1}')
+                self.code.append(f'+31{arg2}')
+                self.next_token() # goto
+                self.next_token() # target line
+                self.code.append(f'+42{"%02d" % (len(self.code) + 2)}')
+                self.code.append(f'+40B{self.current_token[1]}')
+            case '>=':
+                self.code.append(f'+20{arg2}')
+                self.code.append(f'+31{arg1}')
+                self.next_token() # goto
+                self.next_token() # target line
+                self.code.append(f'+41B{self.current_token[1]}')
+                self.code.append(f'+42B{self.current_token[1]}')
+            case '<=':
+                self.code.append(f'+20{arg1}')
+                self.code.append(f'+31{arg2}')
+                self.next_token() # goto
+                self.next_token() # target line
+                self.code.append(f'+41B{self.current_token[1]}')
+                self.code.append(f'+42B{self.current_token[1]}')
+
     def read_goto(self):
         self.next_token() # target line
         self.code.append(f'+40B{self.current_token[1]}')
-
 
     def proc_end(self):
         self.code.append('+4300')
         self.proc_consts()
         self.proc_vars()
+        self.proc_goto()
     
     def proc_consts(self):
         for c_id, const in enumerate(self.consts):
@@ -536,26 +555,41 @@ class CodeGen:
 
     def proc_vars(self):
         for var in self.vars:
-            # Adicionar var após end:
-            if self.vars[var] != None: # Se a var tiver um valor
-                if self.vars[var] < 0:
-                    sign = '-'
-                else:
-                    sign = '+'
-                self.code.append(f'{sign}{"%0004d" % abs(self.vars[var])}')
-            else:
-                # self.code.append(f'+00{"%02d" % len(self.code)}')
-                self.code.append('-7777')
+            self.code.append('-7777')
             # Substituir menções de var pelo endereço de var:
             for l_id, line in enumerate(self.code):
                 if var in line:
                     self.code[l_id] = f'{line[:3]}{"%02d" % (len(self.code) - 1)}' # Manter 3 primeiros caracteres, substituir 2 últimos por len(self.code) - 1
 
+    def proc_goto(self):
+        for simple_line in self.equiv_lines:
+            for l_id, line in enumerate(self.code):
+                if f'B{simple_line}' in line:
+                    self.code[l_id] = f'{line[:3]}{"%02d" % (self.equiv_lines[simple_line])}' # Manter 3 primeiros caracteres, substituir 2 últimos por self.equiv_lines[simple_line]
 
 # ========== Código SIMPLE a ser compilado ==========:
 code = """
-
-99 end
+10 let a = 0 + -1000
+11 let b = 1 + -1
+12 let c = 2 + -2
+14 let d = 3 + -3
+15 let e = 4 + -4
+16 let f = 5 + -5
+17 let g = 6 + -6
+18 let h = 7 + -7
+19 let i = 8 + -8
+20 let j = 9 + -9
+100 let a = 100 + -100
+110 let b = 10 + -10
+120 let c = 20 + -20
+140 let d = 30 + -30
+150 let e = 40 + -40
+160 let f = 50 + -50
+170 let g = 60 + -60
+180 let h = 70 + -70
+190 let i = 80 + -80
+200 let j = 90 + -90
+990 end
 """
 
 lexer = Lexer(code)
@@ -582,20 +616,28 @@ if debug:
             print()
         print(token)
 
-    # Debug: Listar consts e vars
+    # Debug: Comprimento, consts, vars e linhas
+    print(f'\n***Debug***: Endereços ocupados: {len(code_gen.code)}')
     print('\n***Debug***: Consts:')
-    for const in code_gen.consts:
-        print(const)
+    print(code_gen.consts)
     print('\n***Debug***: Vars:')
     print(code_gen.vars)
     print('\n***Debug***: SIMPLE Line | SML Line:')
     print(code_gen.equiv_lines)
 
 # Conferir erros e avisar:
-if (lexer.error or parser.error or semantic_analyzer.error):
+if lexer.error or parser.error or semantic_analyzer.error:
     print('\n***Info***: Erros encontrados na análise!\n')
     if input('***Importante***: Tentar compilar mesmo assim? [S/n]: ') not in ['n', 'N']:
         print('Código inoperante (compilado com erros):')
+        for instr in code_gen.code:
+            print(instr)
+    else:
+        print('Abortando!')
+elif len(code_gen.code) > 100:
+    print('\n***Erro***: Código gerado ocupa mais de 100 endereços!\n')
+    if input('***Importante***: Compilar mesmo assim? [S/n]: ') not in ['n', 'N']:
+        print('Código inoperante (não cabe na memória):')
         for instr in code_gen.code:
             print(instr)
     else:
@@ -604,6 +646,3 @@ else:
     print('\nCompilado com sucesso!\n\nCódigo:')
     for instr in code_gen.code:
         print(instr)
-
-
-# print(f"test: {self.current_token}")
