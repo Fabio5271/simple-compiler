@@ -1,5 +1,5 @@
 import re
-from sys import exit
+import os
 
 class Lexer:
     def __init__(self, code):
@@ -568,29 +568,11 @@ class CodeGen:
                     self.code[l_id] = f'{line[:3]}{"%02d" % (self.equiv_lines[simple_line])}' # Manter 3 primeiros caracteres, substituir 2 últimos por self.equiv_lines[simple_line]
 
 # ========== Código SIMPLE a ser compilado ==========:
-code = """
-10 let a = 0 + -1000
-11 let b = 1 + -1
-12 let c = 2 + -2
-14 let d = 3 + -3
-15 let e = 4 + -4
-16 let f = 5 + -5
-17 let g = 6 + -6
-18 let h = 7 + -7
-19 let i = 8 + -8
-20 let j = 9 + -9
-100 let a = 100 + -100
-110 let b = 10 + -10
-120 let c = 20 + -20
-140 let d = 30 + -30
-150 let e = 40 + -40
-160 let f = 50 + -50
-170 let g = 60 + -60
-180 let h = 70 + -70
-190 let i = 80 + -80
-200 let j = 90 + -90
-990 end
-"""
+if not os.path.exists("source.txt"):
+    print('\n***Erro***: Por favor coloque o código no arquivo "source.txt" no diretório do compilador!\n')
+src_file = open("source.txt", "r")
+code = src_file.read()
+src_file.close()
 
 lexer = Lexer(code)
 tokens = lexer.tokenize()
@@ -628,21 +610,26 @@ if debug:
 # Conferir erros e avisar:
 if lexer.error or parser.error or semantic_analyzer.error:
     print('\n***Info***: Erros encontrados na análise!\n')
-    if input('***Importante***: Tentar compilar mesmo assim? [S/n]: ') not in ['n', 'N']:
-        print('Código inoperante (compilado com erros):')
-        for instr in code_gen.code:
-            print(instr)
-    else:
+    if input('***Importante***: Tentar compilar mesmo assim? [S/n]: ') in ['n', 'N']:
         print('Abortando!')
+        os._exit(0)
+    else:
+        print('Código inoperante (compilado com erros):')
 elif len(code_gen.code) > 100:
     print('\n***Erro***: Código gerado ocupa mais de 100 endereços!\n')
-    if input('***Importante***: Compilar mesmo assim? [S/n]: ') not in ['n', 'N']:
-        print('Código inoperante (não cabe na memória):')
-        for instr in code_gen.code:
-            print(instr)
-    else:
+    if input('***Importante***: Compilar mesmo assim? [S/n]: ') in ['n', 'N']:
         print('Abortando!')
+        os._exit(0)
+    else:
+        print('Código inoperante (não cabe na memória):')
 else:
     print('\nCompilado com sucesso!\n\nCódigo:')
-    for instr in code_gen.code:
-        print(instr)
+
+if os.path.exists("binary.txt"):
+    os.remove("binary.txt")
+bin_file = open("binary.txt", "w")
+for instr in code_gen.code:
+    print(instr)
+    bin_file.write(instr + "\n")
+bin_file.close()
+print('\n"binary.txt" gerado!')
