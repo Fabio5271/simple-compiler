@@ -1,0 +1,28 @@
++2016 (line 0, load C0) +2117 ;store a
++2017;load a
++3016;add C0
++2118;store b
++2017;load a
++3018;add b
++2119;store c
++2016;load C0
++3019;add c
++2120;store d
++2020;load d
++3116;subtr C0
++4215;branchzero 15
++4000;branch 0
++4300;end
++0002;C0
+-7777;a
+-7777;b
+-7777;c
+-7777;d
+
+SIMPLE Code:
+10 let a = 2
+11 let b = a + 2
+12 let c = a + b
+14 let d = 2 + c
+15 if d != 2 goto 10
+99 end
