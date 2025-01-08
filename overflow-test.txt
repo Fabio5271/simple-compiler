@@ -15,7 +15,7 @@
 150 let e = 40 + -40
 160 let f = 50 + -50
 170 let g = 60 + -60
-180 let h = 70 + -70
-190 let i = 80 + -80
-200 let j = 90 + -90
+180 let h = 70
+190 print a
+191 print b
 990 end

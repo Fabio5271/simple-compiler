@@ -1,0 +1,49 @@
++1027 (joined line 0 here, read a) +2027;load a
++2128;store b
++2019;load C0
++3327;multi a
++2129;store c
++2021;load x
++3427;module a
++2130;store d
++2027;load a
++3120;subtr C1
++2131;store e
++2027;load a
++3022;add y
++2132;store f
++2027;load a
++3328;multi b
++2133;store g
++4300;end
++0080;C0
++0001;C1
++0070;x
++0070;y
++0140;z
++0072;w
+-0068;v
++0033;u
+-7777;a
+-7777;b
+-7777;c
+-7777;d
+-7777;e
+-7777;f
+-7777;g
+
+SIMPLE code:
+01 let x = 70
+05 let y = x
+10 let z = x + y
+20 let w = x + 2
+25 let v = 2 - y
+26 let u = 100 / 3
+30 input a
+35 let b = a
+40 let c = 80 * a
+45 let d = x % a
+50 let e = a - 1
+55 let f = a + y
+60 let g = a * b
+99 end

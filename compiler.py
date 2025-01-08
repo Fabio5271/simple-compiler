@@ -569,7 +569,8 @@ class CodeGen:
 
 # ========== Código SIMPLE a ser compilado ==========:
 if not os.path.exists("source.txt"):
-    print('\n***Erro***: Por favor coloque o código no arquivo "source.txt" no diretório do compilador!\n')
+    print('\n***Erro***: Por favor coloque o código no arquivo "source.txt" no diretório do compilador!')
+    print('***Importante***: Se já estiver lá, confira o path do seu shell!\n')
 src_file = open("source.txt", "r")
 code = src_file.read()
 src_file.close()
